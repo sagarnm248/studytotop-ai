@@ -126,6 +126,14 @@ def ask_gemini(parts):
 
 
 # ============================================================
+# SESSION STATE INITIALIZATION
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+
+if "onboarded" not in st.session_state:
+    st.session_state["onboarded"] = False
+
+
 # STEP 1: ONBOARDING
 # ============================================================
 
