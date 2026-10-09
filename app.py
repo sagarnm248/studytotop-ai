@@ -9,28 +9,23 @@ from prompt import (
     SUMMARY_REQUEST_PROMPT,
 )
 
-
 # ============================================================
 # CONFIG
 # ============================================================
 
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-TWILIO_ACCOUNT_SID = st.secrets["TWILIO_ACCOUNT_SID"]
-TWILIO_AUTH_TOKEN = st.secrets["TWILIO_AUTH_TOKEN"]
-TWILIO_WHATSAPP_FROM = st.secrets["TWILIO_WHATSAPP_FROM"]
-TWILIO_CONTENT_SID = st.secrets["TWILIO_CONTENT_SID"]
 
+TWILIO_ACCOUNT_SID = st.secrets.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = st.secrets.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_WHATSAPP_FROM = st.secrets.get("TWILIO_WHATSAPP_FROM", "")
+TWILIO_CONTENT_SID = st.secrets.get("TWILIO_CONTENT_SID", "")
 
-# ============================================================
-# SESSION STATE INITIALIZATION
-# IMPORTANT: This must happen BEFORE messages is accessed.
-# ============================================================
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "onboarded" not in st.session_state:
-    st.session_state.onboarded = False
+TWILIO_ENABLED = all([
+    TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN,
+    TWILIO_WHATSAPP_FROM,
+    TWILIO_CONTENT_SID,
+])
 
 
 # ============================================================
@@ -44,6 +39,9 @@ def get_gemini_client():
 
 @st.cache_resource
 def get_twilio_client():
+    if not TWILIO_ENABLED:
+        return None
+
     return TwilioClient(
         TWILIO_ACCOUNT_SID,
         TWILIO_AUTH_TOKEN
@@ -54,6 +52,7 @@ gemini_client = get_gemini_client()
 twilio_client = get_twilio_client()
 
 MODEL_NAME = "gemini-3.5-flash"
+
 
 
 # ============================================================
@@ -70,9 +69,10 @@ def clean_whatsapp_text(text):
 
 
 def send_summary_to_phone(user_name, to_phone_number, summary):
-    # Content template expects:
-    # {{1}} = name
-    # {{2}} = summary
+    if not TWILIO_ENABLED or twilio_client is None:
+        return False, "WhatsApp is not configured yet."
+
+    import json
 
     try:
         content_variables = {
@@ -84,7 +84,7 @@ def send_summary_to_phone(user_name, to_phone_number, summary):
             from_=TWILIO_WHATSAPP_FROM,
             to=f"whatsapp:{to_phone_number}",
             content_sid=TWILIO_CONTENT_SID,
-            content_variables=st.json.dumps(
+            content_variables=json.dumps(
                 content_variables,
                 ensure_ascii=False
             ),
@@ -94,7 +94,6 @@ def send_summary_to_phone(user_name, to_phone_number, summary):
 
     except Exception as error:
         return False, str(error)
-
 
 def render_message(message):
     with st.chat_message(message["role"]):
